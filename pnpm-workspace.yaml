@@ -3,6 +3,3 @@ packages:
 allowBuilds:
   '@nestjs/core': true
   esbuild: true
-overrides:
-  multer: 2.5.0
-  path-to-regexp: 8.4.2

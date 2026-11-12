@@ -142,6 +142,9 @@ pnpm --filter @financial-risk/web test
 
 ## Política de seguridad
 
+La justificación de las decisiones de sanitización de errores HTTP y manejo
+centralizado en el frontend está documentada en [docs/security.md](docs/security.md).
+
 - No se guardan credenciales ni JWT en el repositorio.
 - El JWT se guarda solo en memoria en la SPA; no se usa `localStorage`.
 - El secreto JWT se obtiene de `JWT_SECRET`, se exige al iniciar el API y debe tener al menos 32 caracteres.

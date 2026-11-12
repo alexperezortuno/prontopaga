@@ -2,26 +2,37 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { ApiError, getErrorMessage, getScore } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import type { ScoreResult } from '../types/score';
+import { formatRut, isValidRut, normalizeRut, rutCaretPosition } from '../utils/rut';
 
 export function ScoreConsultation(): ReactElement {
   const { token, user, logout } = useAuth();
-  const [rut, setRut] = useState(user?.rut ?? '');
+  const [rut, setRut] = useState(formatRut(user?.rut ?? ''));
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user?.role === 'user' && user.rut) setRut(user.rut);
+    if (user?.role === 'user' && user.rut) setRut(formatRut(user.rut));
   }, [user]);
 
   async function consult(): Promise<void> {
-    if (!token || !rut.trim()) return;
+    const normalizedRut = normalizeRut(rut);
+    if (!token || !normalizedRut) {
+      if (rut.trim()) setError('Ingresa un RUT válido.');
+      return;
+    }
+
+    if (!isValidRut(rut)) {
+      setError('Ingresa un RUT válido.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      setResult(await getScore(token, rut.trim()));
+      setResult(await getScore(token, normalizedRut));
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 401) {
         logout(reason.message);
@@ -57,11 +68,28 @@ export function ScoreConsultation(): ReactElement {
         <div className="query-row">
           <input
             id="rut"
+            type="text"
+            inputMode="text"
             value={rut}
-            onChange={(event) => setRut(event.target.value)}
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const value = input.value;
+              const caret = input.selectionStart ?? value.length;
+              const meaningfulCharacters = value.slice(0, caret).replace(/[^0-9Kk]/g, '').length;
+              const formattedValue = formatRut(value);
+              setRut(formattedValue);
+              setError(null);
+              queueMicrotask(() => {
+                input.setSelectionRange(
+                  rutCaretPosition(formattedValue, meaningfulCharacters),
+                  rutCaretPosition(formattedValue, meaningfulCharacters),
+                );
+              });
+            }}
             placeholder="12.345.678-5"
             disabled={user?.role === 'user'}
             aria-describedby="rut-help"
+            aria-invalid={Boolean(error)}
           />
           <button className="button primary" type="button" onClick={consult} disabled={isLoading || !rut.trim()}>
             {isLoading ? 'Consultando…' : 'Consultar score'}

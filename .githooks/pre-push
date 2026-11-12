@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+if "$ROOT_DIR/scripts/audit-deps.sh"; then
+  exit 0
+else
+  status=$?
+  printf 'Push bloqueado: se detectaron vulnerabilidades high o critical.\n' >&2
+  printf 'Revisa el informe de pnpm audit y corrige las dependencias manualmente antes de volver a intentar.\n' >&2
+  exit "$status"
+fi

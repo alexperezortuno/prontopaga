@@ -140,6 +140,47 @@ pnpm --filter @financial-risk/api test
 pnpm --filter @financial-risk/web test
 ```
 
+## Continuous Integration
+
+GitHub Actions ejecuta el pipeline en pushes a `main` y `develop`, pull
+requests hacia esas ramas y ejecuciones manuales. Valida instalación con
+lockfile congelado, lint, pruebas y build de backend y frontend; además ejecuta
+`pnpm audit --audit-level high`. Las vulnerabilidades `high` y `critical`
+bloquean la construcción de imágenes.
+
+Cuando las validaciones y la auditoría pasan, CI construye las imágenes
+Production del API NestJS y del frontend React/Nginx con tags del commit,
+exporta ambas mediante `docker save`, las empaqueta en un ZIP con `manifest.json`
+y publica el ZIP junto con su checksum por 7 días. No se publican imágenes en un
+registry ni se realiza despliegue automático.
+
+Descarga el artefacto `financial-risk-images-<commit-sha>` desde la pestaña
+**Actions**, verifica el checksum y carga las imágenes localmente:
+
+```bash
+sha256sum -c financial-risk-images-<commit-sha>.zip.sha256
+unzip financial-risk-images-<commit-sha>.zip
+docker load --input financial-risk-api.tar
+docker load --input financial-risk-web.tar
+```
+
+La auditoría local se ejecuta con:
+
+```bash
+./scripts/audit-deps.sh
+```
+
+El hook `pre-push` es opcional y usa la misma auditoría. Instálalo solo en este
+repositorio con:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+Los hooks locales pueden omitirse y no sustituyen las validaciones obligatorias
+de CI. La implementación y sus limitaciones están documentadas en
+[docs/ci-cd.md](docs/ci-cd.md).
+
 ## Docker
 
 La configuración Docker separa los ambientes Development, QA y Production.

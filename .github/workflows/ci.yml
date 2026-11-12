@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22.23.2'
+  PNPM_VERSION: '11.8.0'
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Node.js runtime
+        # actions/setup-node v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          pnpm --version
+
+      - name: Enable pnpm cache
+        # actions/setup-node v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build backend and frontend
+        run: pnpm build
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Node.js runtime
+        # actions/setup-node v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          pnpm --version
+
+      - name: Enable pnpm cache
+        # actions/setup-node v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: ./scripts/audit-deps.sh
+
+  docker-build:
+    name: Build production images
+    needs:
+      - validate
+      - security
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        # actions/checkout v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Build API image
+        run: docker build --file apps/api/Dockerfile.prod --tag "financial-risk-api:${IMAGE_TAG::7}" .
+
+      - name: Build web image
+        run: docker build --file apps/web/Dockerfile.prod --tag "financial-risk-web:${IMAGE_TAG::7}" .
+
+      - name: Export images and create artifact
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          artifact_dir="${RUNNER_TEMP}/financial-risk-images"
+          archive_dir="${artifact_dir}/archive"
+          short_sha="${GITHUB_SHA:0:7}"
+          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p "$archive_dir"
+
+          docker save --output "${archive_dir}/financial-risk-api.tar" "financial-risk-api:${short_sha}"
+          docker save --output "${archive_dir}/financial-risk-web.tar" "financial-risk-web:${short_sha}"
+
+          printf '{\n  "images": [\n    {\n      "name": "financial-risk-api",\n      "tag": "%s",\n      "archive": "financial-risk-api.tar"\n    },\n    {\n      "name": "financial-risk-web",\n      "tag": "%s",\n      "archive": "financial-risk-web.tar"\n    }\n  ],\n  "commit_sha": "%s",\n  "build_date": "%s",\n  "platform": "%s/%s"\n}\n' \
+            "$short_sha" "$short_sha" "$GITHUB_SHA" "$build_date" "$RUNNER_OS" "$RUNNER_ARCH" \
+            > "${archive_dir}/manifest.json"
+
+          (cd "$archive_dir" && zip -q -j "${artifact_dir}/financial-risk-images-${GITHUB_SHA}.zip" financial-risk-api.tar financial-risk-web.tar manifest.json)
+          sha256sum "${artifact_dir}/financial-risk-images-${GITHUB_SHA}.zip" > "${artifact_dir}/financial-risk-images-${GITHUB_SHA}.zip.sha256"
+
+          test -s "${artifact_dir}/financial-risk-images-${GITHUB_SHA}.zip"
+          test -s "${artifact_dir}/financial-risk-images-${GITHUB_SHA}.zip.sha256"
+          unzip -l "${artifact_dir}/financial-risk-images-${GITHUB_SHA}.zip"
+
+      - name: Upload Docker image artifact
+        # actions/upload-artifact v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: financial-risk-images-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/financial-risk-images/financial-risk-images-${{ github.sha }}.zip
+            ${{ runner.temp }}/financial-risk-images/financial-risk-images-${{ github.sha }}.zip.sha256
+          if-no-files-found: error
+          retention-days: 7

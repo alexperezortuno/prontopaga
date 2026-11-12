@@ -237,6 +237,39 @@ a `api:3000`. Cambia `WEB_PORT` si el puerto del host está ocupado.
   pnpm sin copiar `node_modules` del host.
 - Los usuarios y el score son memoria del proceso y no se persisten en volúmenes.
 
+## Hardening Nginx
+
+QA y Production incluyen hardening Nginx basado en OWASP, sin agregar otro
+reverse proxy. Development mantiene Vite y HMR sin CSP de producción.
+
+- API general: `10 requests/segundo` por IP, burst `20`.
+- Login: `5 requests/minuto` por IP, burst `3`.
+- Conexiones API: `20` activas por IP.
+- Body máximo: `1 MB`, exceso responde `413`.
+- Timeouts: headers/body `10s`, conexión upstream `5s`, upstream y envío `30s`.
+- Métodos: GET/HEAD para SPA y consultas, POST/OPTIONS solo donde corresponde.
+- Dot-files, `.git`, `.env`, backups, temporales y source maps responden `404`.
+- Cabeceras: `nosniff`, `DENY`, Referrer Policy, Permissions Policy y CSP sin
+  `unsafe-eval`/`unsafe-inline`.
+- Nginx oculta su versión y registra URI sin query string, status y duración;
+  no registra JWT, Authorization, credenciales ni cuerpos.
+
+Los errores Nginx `413`, `429`, `502`, `503` y `504` son respuestas genéricas
+sin body. Los errores Nest siguen siendo bodyless mediante SEC-001. La
+limitación por IP no reemplaza controles por usuario o cuenta; clientes detrás
+de NAT comparten presupuesto. No se confían headers de IP reenviada porque
+Compose recibe conexiones directamente. La documentación completa está en
+[docs/security-nginx.md](docs/security-nginx.md).
+
+Validación rápida:
+
+```bash
+docker compose -f docker/compose.qa.yml config
+docker compose -f docker/compose.qa.yml up -d --build
+docker compose -f docker/compose.qa.yml exec web nginx -t
+docker compose -f docker/compose.qa.yml logs -f web
+```
+
 ## Política de seguridad
 
 La justificación de las decisiones de sanitización de errores HTTP y manejo

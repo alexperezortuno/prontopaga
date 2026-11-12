@@ -1,0 +1,48 @@
+services:
+  api:
+    image: financial-risk-api:dev
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile.dev
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    volumes:
+      - ..:/workspace
+      - api_node_modules:/workspace/node_modules
+      - api_app_node_modules:/workspace/apps/api/node_modules
+      - web_app_node_modules:/workspace/apps/web/node_modules
+    networks:
+      - financial-risk
+
+  web:
+    image: financial-risk-web:dev
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile.dev
+    environment:
+      VITE_API_URL: /api
+      VITE_DEV_API_TARGET: http://api:3000
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ..:/workspace
+      - api_node_modules:/workspace/node_modules
+      - api_app_node_modules:/workspace/apps/api/node_modules
+      - web_app_node_modules:/workspace/apps/web/node_modules
+    depends_on:
+      - api
+    networks:
+      - financial-risk
+
+networks:
+  financial-risk:
+    driver: bridge
+
+volumes:
+  api_node_modules:
+  api_app_node_modules:
+  web_app_node_modules:

@@ -12,7 +12,7 @@ Verifica la instalación:
 node --version
 ```
 
-El proyecto exige Node `>=22.0.0`. No se requiere instalar una base de datos, Docker ni servicios externos.
+El proyecto exige Node `>=22.0.0`. No se requiere instalar una base de datos ni servicios externos.
 
 ## Corepack Y pnpm
 
@@ -25,6 +25,63 @@ pnpm --version
 ```
 
 La salida esperada de pnpm es `11.8.0`. Si Corepack no está disponible en una distribución concreta de Node, instala pnpm 11.8.0 mediante el mecanismo oficial de pnpm y verifica la misma versión antes de continuar.
+
+## Docker Engine Y Compose
+
+Docker es opcional para la ejecución local con pnpm, pero es necesario para
+levantar los ambientes containerizados. Instala Docker Engine siguiendo la
+documentación oficial de tu distribución y agrega el usuario al grupo Docker
+si corresponde. Después de cambiar grupos, inicia una nueva sesión.
+
+Verifica las versiones y el acceso al daemon:
+
+```bash
+docker --version
+docker compose version
+docker info
+```
+
+Se requiere Docker Engine con soporte BuildKit y Docker Compose Plugin. El
+proyecto usa Compose V2 mediante `docker compose`; `docker-compose` no es
+necesario. El usuario debe poder comunicarse con el socket del daemon o
+ejecutar Docker con los permisos administrativos adecuados.
+
+No se requiere instalar Node.js ni pnpm dentro del host para construir las
+imágenes, porque los Dockerfiles fijan Node.js `22.23.2` y pnpm `11.8.0`.
+
+## Ambientes Docker
+
+Desde la raíz del repositorio:
+
+```bash
+./scripts/build-dev.sh
+docker compose -f docker/compose.dev.yml up -d
+docker compose -f docker/compose.dev.yml logs -f
+docker compose -f docker/compose.dev.yml down
+```
+
+Development publica `3000` para el API y `5173` para Vite. Tiene bind mounts
+del código, volúmenes separados para `node_modules`, Nest en watch y HMR de
+Vite. `VITE_API_URL=/api` se resuelve mediante el proxy de Vite hacia
+`http://api:3000`.
+
+QA y Production requieren un `JWT_SECRET` exportado antes de iniciar:
+
+```bash
+export JWT_SECRET="un-secreto-de-al-menos-32-caracteres"
+docker compose -f docker/compose.qa.yml up -d --build
+docker compose -f docker/compose.prod.yml up -d --build
+```
+
+Ambos ambientes compilan sin bind mounts, sirven la SPA con Nginx no
+privilegiado en `8080` y proxyfican `/api/*` hacia el API interno. Production
+no publica el API al host. `WEB_PORT` permite cambiar el puerto externo; el
+puerto interno permanece en `8080`. No hay bases de datos ni servicios externos.
+
+Variables Compose y Vite están listadas en `.env.example`: `JWT_SECRET`,
+`PORT`, `NODE_ENV`, `API_PORT`, `WEB_PORT`, `VITE_API_URL` y
+`VITE_DEV_API_TARGET`. Nunca uses `VITE_*` para secretos, porque Vite los
+incorpora al bundle enviado al navegador.
 
 ## Instalación
 

@@ -140,6 +140,103 @@ pnpm --filter @financial-risk/api test
 pnpm --filter @financial-risk/web test
 ```
 
+## Docker
+
+La configuración Docker separa los ambientes Development, QA y Production.
+Las imágenes usan Node.js `22.23.2`, pnpm `11.8.0` y el lockfile congelado.
+No se copian `.env` ni secretos a las imágenes.
+
+### Variables
+
+Backend:
+
+- `JWT_SECRET`: obligatoria, sin valor por defecto y con al menos 32 caracteres.
+- `PORT`: puerto interno del API, normalmente `3000`.
+- `NODE_ENV`: `development`, `qa` o `production`.
+
+Frontend y Vite:
+
+- `VITE_API_URL`: URL consumida por el navegador. En Docker se usa `/api`.
+- `VITE_DEV_API_TARGET`: destino interno del proxy Vite en development,
+  normalmente `http://api:3000`.
+
+Compose:
+
+- `API_PORT`: puerto del API publicado solo en development. Por defecto: `3000`.
+- `WEB_PORT`: puerto publicado por el frontend. Por defecto: `5173` en
+  development y `8080` en QA/Production.
+
+Antes de levantar QA o Production exporta un secreto real fuera del repositorio:
+
+```bash
+export JWT_SECRET="un-secreto-de-al-menos-32-caracteres"
+```
+
+No uses el valor de `.env.example` en QA o Production. El `.env` local queda
+excluido del contexto Docker.
+
+### Development
+
+Construye ambas imágenes:
+
+```bash
+./scripts/build-dev.sh
+```
+
+También puedes construir una sola:
+
+```bash
+./scripts/build-dev.sh api
+./scripts/build-dev.sh web
+```
+
+Levanta, inspecciona logs y detén el ambiente:
+
+```bash
+docker compose -f docker/compose.dev.yml up -d
+docker compose -f docker/compose.dev.yml logs -f
+docker compose -f docker/compose.dev.yml down
+```
+
+Development publica el API en `http://localhost:3000` y Vite en
+`http://localhost:5173`. El código se monta desde el repositorio y los
+`node_modules` permanecen en volúmenes Docker; Nest usa watch y Vite usa HMR.
+El navegador llama `/api`, y Vite lo reenvía al servicio `api` sin cambiar los
+endpoints públicos `/login` y `/score/:rut`.
+
+### QA
+
+```bash
+docker compose -f docker/compose.qa.yml up -d --build
+```
+
+QA no monta el código, compila Nest y React, ejecuta Nest sin watch y sirve la
+SPA con Nginx no privilegiado en `http://localhost:8080`. El API solo es
+accesible dentro de la red Compose mediante el proxy Nginx.
+
+### Production
+
+```bash
+docker compose -f docker/compose.prod.yml up -d --build
+```
+
+Production usa imágenes multi-stage, dependencias runtime mínimas para el API,
+Nginx no privilegiado para la SPA y no publica directamente el API. El frontend
+queda disponible en `http://localhost:8080` y `/api` se proxifica internamente
+a `api:3000`. Cambia `WEB_PORT` si el puerto del host está ocupado.
+
+### Construcción y solución de problemas
+
+- Validar: `docker compose -f docker/compose.dev.yml config`,
+  `docker compose -f docker/compose.qa.yml config` y
+  `docker compose -f docker/compose.prod.yml config`.
+- Si falta `JWT_SECRET`, Compose rechazará el arranque antes de crear contenedores.
+- Si un puerto está ocupado, define `API_PORT` o `WEB_PORT` sin cambiar el
+  puerto interno de los servicios.
+- Si cambian dependencias, reconstruye con `--build`; BuildKit cachea el store
+  pnpm sin copiar `node_modules` del host.
+- Los usuarios y el score son memoria del proceso y no se persisten en volúmenes.
+
 ## Política de seguridad
 
 La justificación de las decisiones de sanitización de errores HTTP y manejo
@@ -160,4 +257,3 @@ centralizado en el frontend está documentada en [docs/security.md](docs/securit
 - Las credenciales mock están en código para facilitar la prueba técnica y no deben reutilizarse.
 - El score determinista tiene 101 resultados posibles y no es una métrica financiera real.
 - El frontend pierde la sesión al recargar la página por diseño de seguridad del MVP.
-- No se incluye Docker ni despliegue productivo.

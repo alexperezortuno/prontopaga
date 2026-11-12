@@ -1,0 +1,36 @@
+services:
+  api:
+    image: financial-risk-api:prod
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+    restart: unless-stopped
+    networks:
+      - financial-risk
+
+  web:
+    image: financial-risk-web:prod
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile.prod
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - financial-risk
+
+networks:
+  financial-risk:
+    driver: bridge

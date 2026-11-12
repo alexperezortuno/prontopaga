@@ -283,6 +283,12 @@ centralizado en el frontend está documentada en [docs/security.md](docs/securit
 - `.env` está excluido por `.gitignore`; solo se versiona `.env.example`.
 - pnpm usa lockfile congelable y scripts de instalación restringidos. Estos controles reducen superficie de riesgo, pero no eliminan todos los riesgos de supply chain.
 
+## Transparencia y uso de Inteligencia Artificial
+
+Durante el desarrollo de este desafío se utilizaron asistentes de IA como apoyo para la planificación, implementación y documentación.
+
+El detalle de las herramientas y las áreas asistidas se encuentra en [Uso de IA en el desarrollo](docs/ai_interactions.md).
+
 ## Limitaciones conocidas
 
 - Usuarios, credenciales y score no se persisten.

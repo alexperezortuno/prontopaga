@@ -57,6 +57,7 @@ describe('Financial Risk web app', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
 
     expect(await screen.findByRole('heading', { name: 'Consulta financiera' })).toBeInTheDocument();
+    expect(localStorage.getItem('token')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Consultar score' }));
 
     expect(await screen.findByText('73')).toBeInTheDocument();

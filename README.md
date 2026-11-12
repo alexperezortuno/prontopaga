@@ -118,6 +118,10 @@ Respuestas esperadas:
 - `401`: credenciales, token, firma, algoritmo o expiración inválidos.
 - `403`: usuario intentando consultar otro RUT.
 
+Las respuestas de error no incluyen body. El frontend interpreta exclusivamente el
+código HTTP y muestra mensajes genéricos; los detalles técnicos se mantienen solo
+en los registros internos controlados del backend.
+
 ## Pruebas, lint y build
 
 Desde la raíz:
@@ -137,6 +141,9 @@ pnpm --filter @financial-risk/web test
 ```
 
 ## Política de seguridad
+
+La justificación de las decisiones de sanitización de errores HTTP y manejo
+centralizado en el frontend está documentada en [docs/security.md](docs/security.md).
 
 - No se guardan credenciales ni JWT en el repositorio.
 - El JWT se guarda solo en memoria en la SPA; no se usa `localStorage`.

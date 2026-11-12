@@ -1,8 +1,22 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { AppModule } from './app.module';
+import { SanitizedExceptionFilter } from './shared/infrastructure/http/sanitized-exception.filter';
+
+@Controller('test-unexpected')
+class UnexpectedErrorController {
+  @Get()
+  throwUnexpectedError(): never {
+    throw new Error('internal database path and token=do-not-expose');
+  }
+}
 
 describe('Financial Risk API', () => {
   let app: INestApplication;
@@ -15,9 +29,11 @@ describe('Financial Risk API', () => {
 
     const module = await Test.createTestingModule({
       imports: [AppModule],
+      controllers: [UnexpectedErrorController],
     }).compile();
 
     app = module.createNestApplication();
+    app.useGlobalFilters(new SanitizedExceptionFilter());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -79,6 +95,8 @@ describe('Financial Risk API', () => {
 
     expect(invalidCredentials.status).toBe(401);
     expect(invalidBody.status).toBe(400);
+    expect(invalidCredentials.text).toBe('');
+    expect(invalidBody.text).toBe('');
   });
 
   it('rejects a request without a token', async () => {
@@ -87,6 +105,7 @@ describe('Financial Risk API', () => {
     );
 
     expect(response.status).toBe(401);
+    expect(response.text).toBe('');
   });
 
   it('rejects a token with an invalid signature', async () => {
@@ -98,6 +117,7 @@ describe('Financial Risk API', () => {
       .set('Authorization', `Bearer ${parts.join('.')}`);
 
     expect(response.status).toBe(401);
+    expect(response.text).toBe('');
   });
 
   it('rejects an expired token', async () => {
@@ -110,6 +130,7 @@ describe('Financial Risk API', () => {
       .set('Authorization', `Bearer ${expiredToken}`);
 
     expect(response.status).toBe(401);
+    expect(response.text).toBe('');
   });
 
   it('rejects a token signed with an unexpected algorithm', async () => {
@@ -122,6 +143,7 @@ describe('Financial Risk API', () => {
       .set('Authorization', `Bearer ${wrongAlgorithmToken}`);
 
     expect(response.status).toBe(401);
+    expect(response.text).toBe('');
   });
 
   it('allows an admin to consult any valid RUT', async () => {
@@ -155,6 +177,7 @@ describe('Financial Risk API', () => {
       .set('Authorization', `Bearer ${userToken}`);
 
     expect(response.status).toBe(403);
+    expect(response.text).toBe('');
   });
 
   it('returns 400 for an invalid RUT', async () => {
@@ -163,5 +186,22 @@ describe('Financial Risk API', () => {
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(response.status).toBe(400);
+    expect(response.text).toBe('');
+  });
+
+  it('returns an empty body for missing routes', async () => {
+    const response = await request(app.getHttpServer()).get('/does-not-exist');
+
+    expect(response.status).toBe(404);
+    expect(response.text).toBe('');
+  });
+
+  it('converts unexpected exceptions to a sanitized 500 response', async () => {
+    const response = await request(app.getHttpServer()).get('/test-unexpected');
+
+    expect(response.status).toBe(500);
+    expect(response.text).toBe('');
+    expect(response.text).not.toContain('internal database path');
+    expect(response.text).not.toContain('stack');
   });
 });

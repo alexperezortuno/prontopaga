@@ -41,7 +41,7 @@ export function LoginForm(): ReactElement {
         required
       />
 
-      {error && <p className="alert error">No se pudo iniciar sesión. Verifica tus credenciales.</p>}
+      {error && <p className="alert error">{error}</p>}
 
       <button className="button primary" type="submit" disabled={isLoading || !username || !password}>
         {isLoading ? 'Validando…' : 'Iniciar sesión'}

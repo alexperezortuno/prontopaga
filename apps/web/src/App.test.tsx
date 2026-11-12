@@ -70,14 +70,14 @@ describe('Financial Risk web app', () => {
   });
 
   it('shows a clear message when login fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ message: 'Invalid credentials' }, 401)));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, 401)));
     renderApp();
 
     fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'user' } });
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'wrong' } });
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
 
-    expect(await screen.findByText('No se pudo iniciar sesión. Verifica tus credenciales.')).toBeInTheDocument();
+    expect(await screen.findByText('No fue posible autenticar la solicitud.')).toBeInTheDocument();
   });
 
   it('shows a forbidden error for an unauthorized consultation', async () => {
@@ -85,7 +85,7 @@ describe('Financial Risk web app', () => {
       'fetch',
       vi.fn()
         .mockResolvedValueOnce(response(userLogin, 201))
-        .mockResolvedValueOnce(response({ message: 'Insufficient permissions' }, 403)),
+        .mockResolvedValueOnce(response({}, 403)),
     );
     renderApp();
 
@@ -95,7 +95,45 @@ describe('Financial Risk web app', () => {
     await screen.findByRole('heading', { name: 'Consulta financiera' });
     fireEvent.click(screen.getByRole('button', { name: 'Consultar score' }));
 
-    expect(await screen.findByText('No tienes autorización para consultar este RUT.')).toBeInTheDocument();
+    expect(await screen.findByText('No tienes permisos para realizar esta operación.')).toBeInTheDocument();
+  });
+
+  it('clears an authenticated session after a 401 score response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(response(userLogin, 201))
+        .mockResolvedValueOnce(response({}, 401)),
+    );
+    renderApp();
+
+    fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'user' } });
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'user123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+    await screen.findByRole('heading', { name: 'Consulta financiera' });
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar score' }));
+
+    expect(await screen.findByText('No fue posible autenticar la solicitud.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Financial Risk Score' })).toBeInTheDocument();
+  });
+
+  it('keeps an authenticated session after a 403 score response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce(response(userLogin, 201))
+        .mockResolvedValueOnce(response({}, 403)),
+    );
+    renderApp();
+
+    fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'user' } });
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'user123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+    await screen.findByRole('heading', { name: 'Consulta financiera' });
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar score' }));
+
+    expect(await screen.findByText('No tienes permisos para realizar esta operación.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Consulta financiera' })).toBeInTheDocument();
   });
 
   it('logs out and returns to the login form', async () => {

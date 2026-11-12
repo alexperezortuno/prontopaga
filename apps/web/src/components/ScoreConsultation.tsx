@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react';
-import { ApiError, getScore } from '../services/api';
+import { ApiError, getErrorMessage, getScore } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import type { ScoreResult } from '../types/score';
 
@@ -23,15 +23,10 @@ export function ScoreConsultation(): ReactElement {
     try {
       setResult(await getScore(token, rut.trim()));
     } catch (reason) {
-      if (reason instanceof ApiError && reason.status === 403) {
-        setError('No tienes autorización para consultar este RUT.');
-      } else if (reason instanceof ApiError && reason.status === 400) {
-        setError('El RUT ingresado no es válido.');
-      } else if (reason instanceof ApiError && reason.status === 401) {
-        setError('Tu sesión expiró. Inicia sesión nuevamente.');
-        logout();
+      if (reason instanceof ApiError && reason.status === 401) {
+        logout(reason.message);
       } else {
-        setError('No fue posible obtener el score. Intenta nuevamente.');
+        setError(reason instanceof ApiError ? reason.message : getErrorMessage(0));
       }
     } finally {
       setIsLoading(false);
@@ -45,7 +40,7 @@ export function ScoreConsultation(): ReactElement {
           <div className="eyebrow">SCORE CONSOLE</div>
           <h1>Consulta financiera</h1>
         </div>
-        <button className="button ghost" type="button" onClick={logout}>Cerrar sesión</button>
+        <button className="button ghost" type="button" onClick={() => logout()}>Cerrar sesión</button>
       </div>
 
       <div className="profile-strip">

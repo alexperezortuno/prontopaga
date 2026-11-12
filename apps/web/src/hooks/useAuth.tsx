@@ -6,7 +6,7 @@ import {
   type PropsWithChildren,
   type ReactElement,
 } from 'react';
-import { login as loginRequest } from '../services/api';
+import { ApiError, getErrorMessage, login as loginRequest } from '../services/api';
 import type { LoginInput, SessionUser } from '../types/auth';
 
 interface AuthContextValue {
@@ -15,7 +15,7 @@ interface AuthContextValue {
   readonly isLoading: boolean;
   readonly error: string | null;
   readonly login: (input: LoginInput) => Promise<boolean>;
-  readonly logout: () => void;
+  readonly logout: (message?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -38,17 +38,17 @@ export function AuthProvider({ children }: PropsWithChildren): ReactElement {
     } catch (reason) {
       setToken(null);
       setUser(null);
-      setError(reason instanceof Error ? reason.message : 'Error de autenticación');
+      setError(reason instanceof ApiError ? reason.message : getErrorMessage(0));
       return false;
     } finally {
       setIsLoading(false);
     }
   }
 
-  function logout(): void {
+  function logout(message?: string): void {
     setToken(null);
     setUser(null);
-    setError(null);
+    setError(message ?? null);
   }
 
   const value = useMemo(

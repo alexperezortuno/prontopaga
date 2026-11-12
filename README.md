@@ -118,6 +118,10 @@ Respuestas esperadas:
 - `401`: credenciales, token, firma, algoritmo o expiración inválidos.
 - `403`: usuario intentando consultar otro RUT.
 
+Las respuestas de error no incluyen body. El frontend interpreta exclusivamente el
+código HTTP y muestra mensajes genéricos; los detalles técnicos se mantienen solo
+en los registros internos controlados del backend.
+
 ## Pruebas, lint y build
 
 Desde la raíz:

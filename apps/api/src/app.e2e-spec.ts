@@ -56,6 +56,17 @@ describe('Financial Risk API', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.user.rut).toBe('12345678-5');
+
+    const claims = await jwt.verifyAsync<{ sub: string; role: string; rut: string; iat: number; exp: number }>(userToken, {
+      algorithms: ['HS256'],
+    });
+    expect(claims).toMatchObject({
+      sub: 'user-demo-1',
+      role: 'user',
+      rut: '12345678-5',
+    });
+    expect(claims.iat).toEqual(expect.any(Number));
+    expect(claims.exp).toEqual(expect.any(Number));
   });
 
   it('rejects invalid credentials and malformed login bodies', async () => {

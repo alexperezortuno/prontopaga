@@ -1,10 +1,8 @@
 import { StrictMode } from 'react';
-import type { ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
-
-function Bootstrap(): ReactElement {
-  return <main>Financial Risk MVP</main>;
-}
+import { App } from './App';
+import { AuthProvider } from './hooks/useAuth';
+import './styles.css';
 
 const root = document.getElementById('root');
 
@@ -14,6 +12,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <Bootstrap />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </StrictMode>,
 );
